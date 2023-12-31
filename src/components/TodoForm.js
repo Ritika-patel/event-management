@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import bin from "../icons/bin.svg";
 import plus from "../icons/plus.svg";
 import pencil from "../icons/pencil.svg";
+import { Route } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 function TodoForm(props) {
   const [formData, setFormData] = useState({
@@ -10,6 +12,8 @@ function TodoForm(props) {
     eventDescription: props.edit ? props.edit.eventDescription : "",
     eventCategory: props.edit ? props.edit.eventCategory : "",
   });
+
+  const [isEdit, setIsEdit] = useState(false);
 
   const [eventsList, setEventsList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,22 +58,37 @@ function TodoForm(props) {
 
   const addEvent = async () => {
     const isValid = validateForm();
-
     if (!isValid) {
-      // If the form is not valid, return without adding the event
       return;
     }
 
-    const newEvent = {
-      id: Math.floor(Math.random() * 10000),
-      ...formData,
-    };
+    if (isEdit === true) {
+      const index = formData.id;
 
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
+      const updatedEventsList = [...eventsList];
+      updatedEventsList[index] = {
+        eventName: formData.id,
+        eventName: formData.eventName,
+        eventLocation: formData.eventLocation,
+        eventDescription: formData.eventDescription,
+        eventCategory: formData.eventCategory,
+      };
 
-    setEventsList((prevList) => [...prevList, newEvent]);
+      setEventsList(updatedEventsList);
+
+      setIsEdit(false);
+    } else {
+      const newEvent = {
+        id: Math.floor(Math.random() * 10000),
+        ...formData,
+      };
+
+      setIsLoading(true);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setIsLoading(false);
+
+      setEventsList((prevList) => [...prevList, newEvent]);
+    }
 
     setFormData({
       eventName: "",
@@ -162,21 +181,37 @@ function TodoForm(props) {
             isLoading ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
-          {isLoading ? "Adding Event..." : "Add Event"}
+          {isEdit ? "Edit Event" : "Add Event"}
         </button>
       </form>
 
-      <EventList eventsList={eventsList} />
+      <EventList
+        eventsList={eventsList}
+        setEventsList={setEventsList}
+        setFormData={setFormData}
+        formData={formData}
+        setIsEdit={setIsEdit}
+      />
     </>
   );
 }
 
 export default TodoForm;
 
-const EventList = ({ eventsList }) => {
+const EventList = ({
+  eventsList,
+  setEventsList,
+  setFormData,
+  formData,
+  setIsEdit,
+}) => {
+  const navigate = useNavigate();
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isAddMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
+  const [isViewListOpen, setViewListOpen] = useState(false);
+
+  const [guestList, setGuestList] = useState([]);
 
   const [selectedEvent, setSelectedEvent] = useState(null);
 
@@ -199,24 +234,29 @@ const EventList = ({ eventsList }) => {
     setEditDialogOpen(false);
     setDeleteDialogOpen(false);
     setAddMemberDialogOpen(false);
+    setViewListOpen(false);
     setSelectedEvent(null);
   };
 
-  const handleEdit = () => {
-    // Perform edit action here
-    console.log("Editing event:", selectedEvent);
+  const handleEdit = (selectedEvent) => {
+    // Fill the form fields with the selected event's data
+    setIsEdit(true);
+    setFormData({
+      id: selectedEvent.id,
+      eventName: selectedEvent.eventName,
+      eventLocation: selectedEvent.eventLocation,
+      eventDescription: selectedEvent.eventDescription,
+      eventCategory: selectedEvent.eventCategory,
+    });
+
     closeDialogs();
   };
 
-  const handleDelete = () => {
-    // Perform delete action here
-    console.log("Deleting event:", selectedEvent);
-    closeDialogs();
-  };
-
-  const handleAddMember = () => {
-    // Perform add member action here
-    console.log("Adding member to event:", selectedEvent);
+  const handleDelete = (eventId) => {
+    const updatedEventsList = [...eventsList].filter(
+      (event) => event.id !== eventId
+    );
+    setEventsList(updatedEventsList);
     closeDialogs();
   };
 
@@ -226,7 +266,7 @@ const EventList = ({ eventsList }) => {
       <div>
         {eventsList.map((event) => (
           <div key={event.id} className="py-2 px-4">
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <p onClick={() => openDeleteDialog(event)} className="">
                 <img src={bin} alt={""} className="" />
               </p>
@@ -236,49 +276,213 @@ const EventList = ({ eventsList }) => {
               <p onClick={() => openAddMemberDialog(event)} className="">
                 <img src={plus} alt={""} className="" />
               </p>
+              <button
+                className="bg-purple-400 text-white rounded-xl p-2 "
+                onClick={() => setViewListOpen(true)}
+              >
+                view guest
+              </button>
             </div>
 
             <ul className="list-disc">
+              <li>id: {event.id}</li>
               <li>Name: {event.eventName}</li>
               <li>Location: {event.eventLocation}</li>
               <li>Description: {event.eventDescription}</li>
               <li>Category: {event.eventCategory}</li>
             </ul>
+
+            <div>
+              {/* Edit Dialog */}
+              {isEditDialogOpen && (
+                <div className="dialog bg-purple-50 p-4 w-[500px] absolute top-[40%] left-[30%]">
+                  <h3>Edit Event</h3>
+                  <p>Are you sure you want to Edit this event?</p>
+                  <div className="flex justify-between mt-4">
+                    <button
+                      className="bg-red-500 px-4 py-2 text-white"
+                      onClick={() => handleEdit(selectedEvent)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="bg-blue-500 px-4 py-2 text-white"
+                      onClick={closeDialogs}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Delete Dialog */}
+              {isDeleteDialogOpen && (
+                <div className="dialog bg-purple-50 p-4 w-[500px] absolute top-[40%] left-[30%]">
+                  <h3>Delete Event</h3>
+                  <p>Are you sure you want to delete this event?</p>
+                  <div className="flex justify-between mt-4">
+                    <button
+                      className="bg-red-500 px-4 py-2 text-white"
+                      onClick={() => handleDelete(selectedEvent.id)}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      className="bg-blue-500 px-4 py-2 text-white"
+                      onClick={closeDialogs}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Add Member Dialog */}
+              {isAddMemberDialogOpen && (
+                <GuestForm
+                  initialValues={event}
+                  guestList={guestList}
+                  setGuestList={setGuestList}
+                  closeDialogs={closeDialogs}
+                />
+              )}
+
+              {/* Add Member Dialog */}
+              {isViewListOpen && (
+                <ViewGuest guestList={guestList} setGuestList={setGuestList} closeDialogs={closeDialogs} />
+              )}
+            </div>
           </div>
         ))}
       </div>
+    </div>
+  );
+};
 
-      {/* Edit Dialog */}
-      {isEditDialogOpen && (
-        <div className="dialog">
-          <h3>Edit Event</h3>
-          {/* Add form elements for editing event */}
-          <button onClick={handleEdit}>Save</button>
-          <button onClick={closeDialogs}>Cancel</button>
-        </div>
-      )}
+const ViewGuest = ({ guestList, setGuestList,closeDialogs }) => {
+  return (
+    <div className="flex flex-col gap-2 p-6 absolute top-[20%] left-[40%] bg-purple-50 w-[600px]">
+      {guestList.length < 0 ? (
+        <div>No guest added</div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {guestList.map((guest, index) => (
+            <ul key={index} className="list-disc">
+              <li>name: {guest.name}</li>
+              <li>email: {guest.email}</li>
+              <li>rsvp: {guest.rsvp}</li>
+              <li>comments: {guest.comments}</li>
+            </ul>
+          ))}
 
-      {/* Delete Dialog */}
-      {isDeleteDialogOpen && (
-        <div className="dialog">
-          <h3>Delete Event</h3>
-          <p>Are you sure you want to delete this event?</p>
-          <button onClick={handleDelete}>Delete</button>
-          <button onClick={closeDialogs}>Cancel</button>
-        </div>
-      )}
+<button className="bg-red-300 my-2 py-4 w-1/3" onClick={closeDialogs}>
+          Cancel
+        </button>
 
-      {/* Add Member Dialog */}
-      {isAddMemberDialogOpen && (
-        <div className="dialog">
-          <h3>Add Member to Event</h3>
-          {/* Add form elements for adding a member to the event */}
-          <button onClick={handleAddMember}>Add Member</button>
-          <button onClick={closeDialogs}>Cancel</button>
         </div>
       )}
     </div>
   );
 };
 
+const GuestForm = ({ guestList, setGuestList, closeDialogs }) => {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    rsvp: "",
+    comments: "",
+  });
 
+  const addEvent = () => {
+    setGuestList((prevList) => [...prevList, formData]);
+    setFormData({
+      name: "",
+      email: "",
+      rsvp: "",
+      comments: "",
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      await addEvent();
+    } catch (error) {
+      console.error("Error adding event:", error);
+    }
+
+    console.log("formData", formData);
+    console.log("guestList", guestList);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-2 p-6 absolute top-[20%] left-[40%] bg-purple-50 w-[600px]"
+    >
+      <label htmlFor="name">Guest Name</label>
+      <input
+        type="text"
+        id="name"
+        name="name"
+        value={formData.name || ""}
+        onChange={handleChange}
+        required
+        className="border-2 border-gray-900"
+      />
+
+      <label htmlFor="email">Email</label>
+      <input
+        type="email"
+        id="email"
+        name="email"
+        value={formData.email || ""}
+        onChange={handleChange}
+        required
+        className="border-2 border-gray-900"
+      />
+
+      <label htmlFor="rsvp">RSVP</label>
+      <select
+        id="rsvp"
+        name="rsvp"
+        value={formData.rsvp || "Attending"}
+        onChange={handleChange}
+        required
+        className="border-2 border-gray-900"
+      >
+        <option value="Attending">Attending</option>
+        <option value="Not Attending">Not Attending</option>
+        <option value="Pending">Pending</option>
+      </select>
+
+      <label htmlFor="comments">Comments</label>
+      <textarea
+        id="comments"
+        name="comments"
+        value={formData.comments || ""}
+        onChange={handleChange}
+        className="border-2 border-gray-900"
+      />
+
+      <div className="flex justify-between">
+        <button type="submit" className="bg-blue-300 my-2 py-4 w-1/3">
+          Save
+        </button>
+
+        <button className="bg-red-300 my-2 py-4 w-1/3" onClick={closeDialogs}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+};
